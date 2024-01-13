@@ -12,6 +12,5 @@ Garland is a new project for object catalogs, graphs and exhibits.  See: [Garlan
 To start, run these two commands from different terminals:
 
 ``` bash
-$ cd frontend && pnpm dev
-$ cd backend && bin/rails server
+$ cd garland & bin/rails server
 ```
