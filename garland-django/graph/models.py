@@ -9,9 +9,9 @@ class Node(models.Model):
     objects = InheritanceManager()
     nodes = models.ManyToManyField(
         "self",
-        through="NodeRelation",
+        through="Edge",
         symmetrical=False,
-        through_fields=("node_subject", "node_dobject"),
+        through_fields=("subject", "dobject"),
     )
 
     slug = models.SlugField()
@@ -19,28 +19,77 @@ class Node(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
 
-class NodeRelation(models.Model):
-    kind_choices = {
-        "parent_of": "parent of",
-        "has_parent": "has parent",
+class Edge(models.Model):
+    CHOICES = {
+        "child_of": "child of",
+        "has_child": "has child",
+        "spouse_of": "spouse of",
+        "sibling_of": "sibling of",
     }
 
-    def get_opposite_relationship(self):
-        opposites = {
-            "parent_of": "has_parent",
-            "has_parent": "parent_of",
-        }
-        return opposites.get(self.kind, "parent_of")
+    kind = models.CharField(
+        max_length=200,
+        choices=CHOICES,
+    )
 
-    kind = models.CharField(max_length=200, choices=kind_choices)
+    def kind_opposite(self, key):
+        return {
+            "child_of": "has_child",
+            "has_child": "child_of",
+            "spouse_of": "spouse_of",
+            "sibling_of": "sibling_of",
+        }.get(key)
+
     order = models.IntegerField(default=0)
 
-    node_subject = models.ForeignKey(
-        Node, related_name="has_node", on_delete=models.CASCADE
-    )
-    node_dobject = models.ForeignKey(
-        Node, related_name="of_node", on_delete=models.CASCADE
-    )
+    subject = models.ForeignKey(Node, related_name="dobjects", on_delete=models.CASCADE)
+    dobject = models.ForeignKey(Node, related_name="subjects", on_delete=models.CASCADE)
+
+    def save(self, *args, **kwargs):
+        creating = self._state.adding
+        super(Edge, self).save(*args, **kwargs)
+        if creating:
+            # Check if the reciprocal edge already exists
+            reciprocal_edge_exists = Edge.objects.filter(
+                subject=self.dobject,
+                kind=self.kind_opposite(self.kind),
+                dobject=self.subject,
+            ).exists()
+
+            if not reciprocal_edge_exists:
+                # Create reciprocal edge
+                Edge.objects.create(
+                    subject=self.dobject,
+                    kind=self.kind_opposite(self.kind),
+                    dobject=self.subject,
+                )
+
+    def delete(self, *args, **kwargs):
+        # Find and delete the reciprocal edge
+        reciprocal_edge = Edge.objects.filter(
+            subject=self.dobject,
+            kind=self.kind_opposite(self.kind),
+            dobject=self.subject,
+        ).first()
+        super(Edge, self).delete(*args, **kwargs)
+        if reciprocal_edge:
+            reciprocal_edge.delete()
+
+    # not yet working
+    # def update(self, *args, **kwargs):
+    #     # Find and update the reciprocal edge
+    #     reciprocal_edge = Edge.objects.filter(
+    #         subject=self.dobject,
+    #         kind=self.kind_opposite(self.kind),
+    #         dobject=self.subject,
+    #     ).first()
+    #     super(Edge, self).update(*args, **kwargs)
+    #     if reciprocal_edge:
+    #         reciprocal_edge.update(
+    #             subject=self.dobject,
+    #             kind=self.kind_opposite(self.kind),
+    #             dobject=self.subject,
+    #         )
 
 
 # class Person(Node):
