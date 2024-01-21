@@ -1,3 +1,87 @@
-from django.test import TestCase
+from django.test import TestCase, TransactionTestCase
+from .models import Node, Edge
+from django.db import transaction
+from django.db.utils import IntegrityError
 
 # Create your tests here.
+
+
+class GraphTestCase(TestCase):
+    def setUp(self):
+        self.john = Node.objects.create(slug="john")
+        self.jill = Node.objects.create(slug="jill")
+        self.jeff = Node.objects.create(slug="jeff")
+        self.jane = Node.objects.create(slug="jane")
+
+    def test_ok(self):
+        self.assertEqual(1, 1)
+
+    def test_kind_opposite(self):
+        self.assertEqual(Edge.kind_opposite(self, "child_of"), "has_child")
+        self.assertEqual(Edge.kind_opposite(self, "sibling_of"), "sibling_of")
+
+    def test_edge_and_reciprocal_creation(self):
+        # Create an Edge
+        edge = Edge.objects.create(subject=self.john, kind="has_child", dobject=self.jane)
+
+        # Check if the Edge is created
+        self.assertTrue(
+            Edge.objects.filter(subject=self.john, dobject=self.jane).exists()
+        )
+
+        # Check if the reciprocal Edge is created
+        self.assertTrue(
+            Edge.objects.filter(subject=self.jane, dobject=self.john).exists()
+        )
+
+        # quick double chedk that things are wired correctly
+        self.assertFalse(
+            Edge.objects.filter(subject=self.jane, dobject=self.jill).exists()
+        )
+
+        # check same object
+        self.assertEqual(edge, edge.reciprocal_edge.edge)
+
+    def test_edge_and_reciprocal_deletion(self):
+        # Create an Edge
+        edge = Edge.objects.create(subject=self.john, kind="has_child", dobject=self.jane)
+        reciprocal = edge.reciprocal_edge
+        edge.delete()
+
+        # Check if the Edge and its reciprocal are deleted
+        self.assertFalse(Edge.objects.filter(subject=self.john, dobject=self.jane).exists())
+        self.assertFalse(Edge.objects.filter(subject=self.jane, dobject=self.john).exists())
+
+    
+    def test_multiple_edges_between_same_nodes(self):
+        Edge.objects.create(subject=self.john, kind="sibling_of", dobject=self.jane)
+        Edge.objects.create(subject=self.john, kind="has_child", dobject=self.jane) # I know: gross; it's just a test
+
+        # Check the count of edges between the same nodes
+        self.assertEqual(Edge.objects.filter(subject=self.john, dobject=self.jane).count(), 2)
+        self.assertEqual(Edge.objects.filter(subject=self.jane, dobject=self.john).count(), 2)
+        self.assertEqual(Edge.objects.all().count(), 4)
+
+    def test_deletion_of_node_deletes_edges(self):
+        edge = Edge.objects.create(subject=self.john, kind="has_child", dobject=self.jane)
+        self.assertEqual(Edge.objects.count(), 2)
+        self.john.delete()
+
+        # Check if edges associated with the deleted node are also deleted
+        self.assertEqual(Edge.objects.count(), 0)
+
+    def test_edge_creation_with_invalid_data(self):
+        with self.assertRaises(IntegrityError):
+            Edge.objects.create(subject=self.john, dobject=None)
+
+    def test_edge_creation_also_creates_reciprocal_edge(self):
+        pass
+
+    def test_update_of_node_updates_reciprocal_edge(self):
+        edge = Edge.objects.create(subject=self.john, kind="child_of", dobject=self.jane)
+        self.assertEqual(Edge.objects.all().count(), 2)
+
+        edge.kind="has_child"
+        edge.save()
+        self.assertEqual(Edge.objects.all().count(), 2)
+        self.assertEqual(edge.reciprocal_edge.kind, "child_of")

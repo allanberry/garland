@@ -1,4 +1,4 @@
-from django.db import models
+from django.db import models, transaction
 from model_utils.managers import InheritanceManager
 
 
@@ -25,6 +25,7 @@ class Edge(models.Model):
         "has_child": "has child",
         "spouse_of": "spouse of",
         "sibling_of": "sibling of",
+        "friend_of": "friend of",
     }
 
     kind = models.CharField(
@@ -38,58 +39,30 @@ class Edge(models.Model):
             "has_child": "child_of",
             "spouse_of": "spouse_of",
             "sibling_of": "sibling_of",
+            "friend_of": "friend_of",
         }.get(key)
 
     order = models.IntegerField(default=0)
 
     subject = models.ForeignKey(Node, related_name="dobjects", on_delete=models.CASCADE)
+    reciprocal_edge = models.OneToOneField("self", on_delete=models.CASCADE, null=True)
     dobject = models.ForeignKey(Node, related_name="subjects", on_delete=models.CASCADE)
 
-    def save(self, *args, **kwargs):
-        creating = self._state.adding
-        super(Edge, self).save(*args, **kwargs)
-        if creating:
-            # Check if the reciprocal edge already exists
-            reciprocal_edge_exists = Edge.objects.filter(
+    def save(self, checkReciprocal=True, *args, **kwargs):
+        super().save(*args, **kwargs)  # Call the "real" save() method.
+        if not self.reciprocal_edge:
+            self.reciprocal_edge = Edge.objects.create(
                 subject=self.dobject,
                 kind=self.kind_opposite(self.kind),
                 dobject=self.subject,
-            ).exists()
-
-            if not reciprocal_edge_exists:
-                # Create reciprocal edge
-                Edge.objects.create(
-                    subject=self.dobject,
-                    kind=self.kind_opposite(self.kind),
-                    dobject=self.subject,
-                )
-
-    def delete(self, *args, **kwargs):
-        # Find and delete the reciprocal edge
-        reciprocal_edge = Edge.objects.filter(
-            subject=self.dobject,
-            kind=self.kind_opposite(self.kind),
-            dobject=self.subject,
-        ).first()
-        super(Edge, self).delete(*args, **kwargs)
-        if reciprocal_edge:
-            reciprocal_edge.delete()
-
-    # not yet working
-    # def update(self, *args, **kwargs):
-    #     # Find and update the reciprocal edge
-    #     reciprocal_edge = Edge.objects.filter(
-    #         subject=self.dobject,
-    #         kind=self.kind_opposite(self.kind),
-    #         dobject=self.subject,
-    #     ).first()
-    #     super(Edge, self).update(*args, **kwargs)
-    #     if reciprocal_edge:
-    #         reciprocal_edge.update(
-    #             subject=self.dobject,
-    #             kind=self.kind_opposite(self.kind),
-    #             dobject=self.subject,
-    #         )
+                reciprocal_edge=self,
+            )
+        if self.reciprocal_edge and checkReciprocal:
+            self.reciprocal_edge.subject = self.dobject
+            self.reciprocal_edge.kind = self.kind_opposite(self.kind)
+            self.reciprocal_edge.dobject = self.subject
+            self.reciprocal_edge.reciprocal_edge = self
+            self.reciprocal_edge.save(checkReciprocal=False)
 
 
 # class Person(Node):
