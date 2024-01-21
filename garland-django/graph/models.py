@@ -17,6 +17,7 @@ class Node(models.Model):
     slug = models.SlugField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    about = models.TextField(blank=True)
 
 
 class Edge(models.Model):
@@ -65,16 +66,76 @@ class Edge(models.Model):
             self.reciprocal_edge.save(checkReciprocal=False)
 
 
-# class Person(Node):
-#     def __str__(self):
-#         return f"{self.name_last}, {self.name_first}"
+class Person(Node):
+    def __str__(self):
+        return f"{self.name_last}, {self.name_first}"
 
-#     name_last = models.CharField(max_length=200)
-#     name_first = models.CharField(max_length=200)
+    name_last = models.CharField(max_length=200, blank=True)
+    name_first = models.CharField(max_length=200)
+    gender = models.CharField(
+        max_length=20,
+        blank=True,
+        choices=[
+            (None, "not specified"),
+            ("female", "female"),
+            ("male", "male"),
+            ("nonbinary", "non-binary"),
+        ],
+    )
 
 
-# class Org(Node):
-#     def __str__(self):
-#         return self.name
+class Place(Node):
+    name = models.CharField(max_length=200)
+    kind = models.CharField(
+        max_length=20,
+        blank=True,
+        choices=[
+            (None, "not specified"),
+            ("dwelling", "dwelling"),
+            ("business", "business"),
+        ],
+    )
 
-#     name = models.CharField(max_length=200)
+
+class Thing(Node):
+    name = models.CharField(max_length=200)
+    is_work = models.BooleanField(null=False, default=False)
+    kind = models.CharField(
+        max_length=20,
+        blank=True,
+        choices=[
+            (None, "not specified"),
+            ("object", "object"),
+            ("article", "article"),
+            ("artwork", "artwork"),
+            ("book", "book"),
+            ("sculpture", "sculpture"),
+            ("website", "website"),
+        ],
+    )
+
+class Event(Node):
+    name = models.CharField(max_length=200)
+    kind = models.CharField(
+        max_length=20,
+        blank=True,
+        choices=[
+            (None, "not specified"),
+            ("performance", "performance"),
+            ("gathering", "gathering"),
+        ],
+    )
+
+class Set(Node):
+    name = models.CharField(max_length=200)
+    kind = models.CharField(
+        max_length=20,
+        blank=True,
+        choices=[
+            (None, "not specified"),
+            ("org", "organization"),
+            ("collection", "object collection"),
+            ("series", "event series"),
+            ("bibliography", "list of works"),
+        ],
+    )

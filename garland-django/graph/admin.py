@@ -1,7 +1,7 @@
 from django import forms
 from django.contrib import admin
 from django.forms.models import BaseInlineFormSet
-from .models import Node, Edge
+from .models import Node, Edge, Person, Place, Thing, Event, Set
 
 
 class SubjectInline(admin.TabularInline):
@@ -20,7 +20,6 @@ class DobjectInline(admin.TabularInline):
 
 class EdgeInline(admin.TabularInline):
     model = Edge
-    # formset = CustomInlineFormSet
     extra = 0
 
     # dummy foreign key field to satisfy Django System Check (we're overriding it anyways)
@@ -31,9 +30,27 @@ class EdgeInline(admin.TabularInline):
         formset.instance = obj
         return formset
 
-
 class NodeAdmin(admin.ModelAdmin):
     inlines = [EdgeInline]
 
+class PersonAdmin(NodeAdmin):
+    pass
 
-admin.site.register(Node, NodeAdmin)
+class PlaceAdmin(NodeAdmin):
+    pass
+
+class ThingAdmin(NodeAdmin):
+    pass
+
+class EventAdmin(NodeAdmin):
+    pass
+
+class SetAdmin(NodeAdmin):
+    pass
+
+# admin.site.register(Node, NodeAdmin)
+admin.site.register(Person, PersonAdmin)
+admin.site.register(Place, PlaceAdmin)
+admin.site.register(Thing, ThingAdmin)
+admin.site.register(Event, EventAdmin)
+admin.site.register(Set, EventAdmin)

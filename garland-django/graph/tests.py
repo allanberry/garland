@@ -1,5 +1,5 @@
 from django.test import TestCase, TransactionTestCase
-from .models import Node, Edge
+from .models import Node, Edge, Person, Place, Thing, Event, Set
 from django.db import transaction
 from django.db.utils import IntegrityError
 
@@ -8,13 +8,39 @@ from django.db.utils import IntegrityError
 
 class GraphTestCase(TestCase):
     def setUp(self):
-        self.john = Node.objects.create(slug="john")
-        self.jill = Node.objects.create(slug="jill")
-        self.jeff = Node.objects.create(slug="jeff")
-        self.jane = Node.objects.create(slug="jane")
+        # generic objects
+        self.nodeA = Node.objects.create(slug="nodeA")
+        self.nodeB = Node.objects.create(slug="nodeB")
+
+        # people
+        self.john = Person.objects.create(slug="john", gender="male")
+        self.jill = Person.objects.create(slug="jill", gender="female")
+        self.jeff = Person.objects.create(slug="jeff")
+        self.sam = Person.objects.create(slug="sam", gender="nonbinary")
+
+        # places
+        self.whitehouse = Place.objects.create(slug="whitehouse", kind="dwelling")
+
+        # things
+        self.candlestick = Thing.objects.create(slug="candlestick", is_work=False, kind="object")
+        self.demoiselles = Thing.objects.create(slug="demoiselles", is_work=True, kind="artwork")
+
+        # events
+        self.woodstock = Event.objects.create(slug="woodstock", kind="performance")
+
+        # sets
+        self.oralhistory = Set.objects.create(slug="oralhistory", kind="collection")
 
     def test_ok(self):
-        self.assertEqual(1, 1)
+        self.assertEqual(1+1, 2)
+
+    def test_node_counts(self):
+        self.assertEqual(Node.objects.all().count(), 11)
+        self.assertEqual(Person.objects.all().count(), 4)
+        self.assertEqual(Place.objects.all().count(), 1)
+        self.assertEqual(Thing.objects.all().count(), 2)
+        self.assertEqual(Event.objects.all().count(), 1)
+        self.assertEqual(Set.objects.all().count(), 1)
 
     def test_kind_opposite(self):
         self.assertEqual(Edge.kind_opposite(self, "child_of"), "has_child")
@@ -22,21 +48,23 @@ class GraphTestCase(TestCase):
 
     def test_edge_and_reciprocal_creation(self):
         # Create an Edge
-        edge = Edge.objects.create(subject=self.john, kind="has_child", dobject=self.jane)
+        edge = Edge.objects.create(
+            subject=self.john, kind="has_child", dobject=self.sam
+        )
 
         # Check if the Edge is created
         self.assertTrue(
-            Edge.objects.filter(subject=self.john, dobject=self.jane).exists()
+            Edge.objects.filter(subject=self.john, dobject=self.sam).exists()
         )
 
         # Check if the reciprocal Edge is created
         self.assertTrue(
-            Edge.objects.filter(subject=self.jane, dobject=self.john).exists()
+            Edge.objects.filter(subject=self.sam, dobject=self.john).exists()
         )
 
         # quick double chedk that things are wired correctly
         self.assertFalse(
-            Edge.objects.filter(subject=self.jane, dobject=self.jill).exists()
+            Edge.objects.filter(subject=self.sam, dobject=self.jill).exists()
         )
 
         # check same object
@@ -44,26 +72,39 @@ class GraphTestCase(TestCase):
 
     def test_edge_and_reciprocal_deletion(self):
         # Create an Edge
-        edge = Edge.objects.create(subject=self.john, kind="has_child", dobject=self.jane)
+        edge = Edge.objects.create(
+            subject=self.john, kind="has_child", dobject=self.sam
+        )
         reciprocal = edge.reciprocal_edge
         edge.delete()
 
         # Check if the Edge and its reciprocal are deleted
-        self.assertFalse(Edge.objects.filter(subject=self.john, dobject=self.jane).exists())
-        self.assertFalse(Edge.objects.filter(subject=self.jane, dobject=self.john).exists())
+        self.assertFalse(
+            Edge.objects.filter(subject=self.john, dobject=self.sam).exists()
+        )
+        self.assertFalse(
+            Edge.objects.filter(subject=self.sam, dobject=self.john).exists()
+        )
 
-    
     def test_multiple_edges_between_same_nodes(self):
-        Edge.objects.create(subject=self.john, kind="sibling_of", dobject=self.jane)
-        Edge.objects.create(subject=self.john, kind="has_child", dobject=self.jane) # I know: gross; it's just a test
+        Edge.objects.create(subject=self.john, kind="sibling_of", dobject=self.sam)
+        Edge.objects.create(
+            subject=self.john, kind="has_child", dobject=self.sam
+        )  # I know: gross; it's just a test
 
         # Check the count of edges between the same nodes
-        self.assertEqual(Edge.objects.filter(subject=self.john, dobject=self.jane).count(), 2)
-        self.assertEqual(Edge.objects.filter(subject=self.jane, dobject=self.john).count(), 2)
+        self.assertEqual(
+            Edge.objects.filter(subject=self.john, dobject=self.sam).count(), 2
+        )
+        self.assertEqual(
+            Edge.objects.filter(subject=self.sam, dobject=self.john).count(), 2
+        )
         self.assertEqual(Edge.objects.all().count(), 4)
 
     def test_deletion_of_node_deletes_edges(self):
-        edge = Edge.objects.create(subject=self.john, kind="has_child", dobject=self.jane)
+        edge = Edge.objects.create(
+            subject=self.john, kind="has_child", dobject=self.sam
+        )
         self.assertEqual(Edge.objects.count(), 2)
         self.john.delete()
 
@@ -74,14 +115,11 @@ class GraphTestCase(TestCase):
         with self.assertRaises(IntegrityError):
             Edge.objects.create(subject=self.john, dobject=None)
 
-    def test_edge_creation_also_creates_reciprocal_edge(self):
-        pass
-
     def test_update_of_node_updates_reciprocal_edge(self):
-        edge = Edge.objects.create(subject=self.john, kind="child_of", dobject=self.jane)
+        edge = Edge.objects.create(subject=self.john, kind="child_of", dobject=self.sam)
         self.assertEqual(Edge.objects.all().count(), 2)
 
-        edge.kind="has_child"
+        edge.kind = "has_child"
         edge.save()
         self.assertEqual(Edge.objects.all().count(), 2)
         self.assertEqual(edge.reciprocal_edge.kind, "child_of")
