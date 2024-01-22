@@ -1,11 +1,20 @@
 from django.db import models, transaction
+from django.utils.text import slugify
 from model_utils.managers import InheritanceManager
+import textwrap
+
+
+# ------------#
+# Graph Base #
+# ------------#
 
 
 class Node(models.Model):
     def __str__(self):
-        return self.slug
+        return self.name
 
+    slug = models.SlugField(unique=True)
+    name = models.CharField(max_length=200)
     objects = InheritanceManager()
     nodes = models.ManyToManyField(
         "self",
@@ -14,10 +23,19 @@ class Node(models.Model):
         through_fields=("subject", "dobject"),
     )
 
-    slug = models.SlugField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     about = models.TextField(blank=True)
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = textwrap.shorten(slugify(self.name), width=50)
+        super().save(*args, **kwargs)
+
+    def clean(self):
+        super().clean()
+
+        # TODO: need here to auto change slug if integrity error
 
 
 class Edge(models.Model):
@@ -66,12 +84,19 @@ class Edge(models.Model):
             self.reciprocal_edge.save(checkReciprocal=False)
 
 
+# ----------------#
+# Graph Specific #
+# ----------------#
+
+
 class Person(Node):
     def __str__(self):
-        return f"{self.name_last}, {self.name_first}"
+        if self.surname:
+            return f"{self.surname}, {self.name}"
+        else:
+            return self.name
 
-    name_last = models.CharField(max_length=200, blank=True)
-    name_first = models.CharField(max_length=200)
+    surname = models.CharField(max_length=200, blank=True)
     gender = models.CharField(
         max_length=20,
         blank=True,
@@ -83,9 +108,20 @@ class Person(Node):
         ],
     )
 
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            if self.surname:
+                str = f"{self.surname}, {self.name}"
+            else:
+                str = self.name
+            self.slug = slugify(textwrap.shorten(str, width=50))
+        super().save(*args, **kwargs)
+
 
 class Place(Node):
-    name = models.CharField(max_length=200)
+    def __str__(self):
+        return self.name
+
     kind = models.CharField(
         max_length=20,
         blank=True,
@@ -98,7 +134,9 @@ class Place(Node):
 
 
 class Thing(Node):
-    name = models.CharField(max_length=200)
+    def __str__(self):
+        return self.name
+
     is_work = models.BooleanField(null=False, default=False)
     kind = models.CharField(
         max_length=20,
@@ -114,8 +152,11 @@ class Thing(Node):
         ],
     )
 
+
 class Event(Node):
-    name = models.CharField(max_length=200)
+    def __str__(self):
+        return self.name
+
     kind = models.CharField(
         max_length=20,
         blank=True,
@@ -126,8 +167,11 @@ class Event(Node):
         ],
     )
 
+
 class Set(Node):
-    name = models.CharField(max_length=200)
+    def __str__(self):
+        return self.name
+
     kind = models.CharField(
         max_length=20,
         blank=True,
@@ -139,3 +183,32 @@ class Set(Node):
             ("bibliography", "list of works"),
         ],
     )
+
+
+# ---------------#
+# Graph Support #
+# ---------------#
+
+# class Time(models.Model):
+#     pass
+
+# class Location(models.Model):
+#     pass
+
+# class Web(models.Model):
+#     pass
+
+# class Email(models.Model):
+#     pass
+
+# class Phone(models.Model):
+#     pass
+
+# class Medium(models.Model):
+#     pass
+
+# class Genre(models.Model):
+#     pass
+
+# class Size(models.Model):
+#     pass

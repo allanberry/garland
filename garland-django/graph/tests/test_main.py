@@ -1,5 +1,5 @@
 from django.test import TestCase, TransactionTestCase
-from .models import Node, Edge, Person, Place, Thing, Event, Set
+from ..models import Node, Edge, Person, Place, Thing, Event, Set
 from django.db import transaction
 from django.db.utils import IntegrityError
 
@@ -13,26 +13,39 @@ class GraphTestCase(TestCase):
         self.nodeB = Node.objects.create(slug="nodeB")
 
         # people
-        self.john = Person.objects.create(slug="john", gender="male")
-        self.jill = Person.objects.create(slug="jill", gender="female")
-        self.jeff = Person.objects.create(slug="jeff")
-        self.sam = Person.objects.create(slug="sam", gender="nonbinary")
+        self.john = Person.objects.create(
+            name="John", surname="Smith", gender="male"
+        )
+        self.jill = Person.objects.create(
+            slug="jill", name="Jill", surname="Jones", gender="female"
+        )
+        self.jeff = Person.objects.create(
+            name="Jeff",
+            surname="Smith-Jones",
+        )
+        self.sam = Person.objects.create(
+            name="Sam", surname="Smith", gender="nonbinary"
+        )
 
         # places
         self.whitehouse = Place.objects.create(slug="whitehouse", kind="dwelling")
 
         # things
-        self.candlestick = Thing.objects.create(slug="candlestick", is_work=False, kind="object")
-        self.demoiselles = Thing.objects.create(slug="demoiselles", is_work=True, kind="artwork")
+        self.candlestick = Thing.objects.create(
+            slug="candlestick", is_work=False, kind="object"
+        )
+        self.demoiselles = Thing.objects.create(
+            slug="demoiselles", name="Les Demoiselles d'Avignon", is_work=True, kind="artwork"
+        )
 
         # events
-        self.woodstock = Event.objects.create(slug="woodstock", kind="performance")
+        self.woodstock = Event.objects.create(slug="Woodstock Music & Art Fair", name="Woodstock", kind="performance")
 
         # sets
-        self.oralhistory = Set.objects.create(slug="oralhistory", kind="collection")
+        self.oralhistory = Set.objects.create(slug="testoralhistory", name="Test Oral History", kind="collection")
 
     def test_ok(self):
-        self.assertEqual(1+1, 2)
+        self.assertEqual(1 + 1, 2)
 
     def test_node_counts(self):
         self.assertEqual(Node.objects.all().count(), 11)
@@ -123,3 +136,39 @@ class GraphTestCase(TestCase):
         edge.save()
         self.assertEqual(Edge.objects.all().count(), 2)
         self.assertEqual(edge.reciprocal_edge.kind, "child_of")
+
+    def test_slug_exists(self):
+        self.assertTrue(self.john.slug)
+        self.assertTrue(self.jill.slug)
+        self.assertTrue(self.jeff.slug)
+        self.assertTrue(self.sam.slug)
+
+        # self.john = Person.objects.create(
+        #     name="John", surname="Smith", gender="male"
+        # )
+        # self.jill = Person.objects.create(
+        #     slug="jill", name="Jill", surname="Jones", gender="female"
+        # )
+        # self.jeff = Person.objects.create(
+        #     name="Jeff",
+        #     surname="Smith-Jones",
+        # )
+        # self.sam = Person.objects.create(
+        #     name="Sam", surname="Smith", gender="nonbinary"
+        # )
+
+
+
+    def test_slug_unique_custom_(self):
+        self.john_jones = Person.objects.create(
+            name="John", surname="Jones"
+        )
+        # self.john_smith_2 = Person.objects.create(
+        #     name="John", surname="Smith"
+        # )
+
+        print(self.john.slug)
+        print(self.john_jones.slug)
+        # print(self.john_smith_2.slug)
+
+        # TODO: modify test to check for auto clean in Node

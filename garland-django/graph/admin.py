@@ -21,6 +21,7 @@ class DobjectInline(admin.TabularInline):
 class EdgeInline(admin.TabularInline):
     model = Edge
     extra = 0
+    exclude = ('reciprocal_edge','order',)
 
     # dummy foreign key field to satisfy Django System Check (we're overriding it anyways)
     fk_name = "subject"
@@ -32,9 +33,10 @@ class EdgeInline(admin.TabularInline):
 
 class NodeAdmin(admin.ModelAdmin):
     inlines = [EdgeInline]
+    prepopulated_fields = {"slug": ["name"]}
 
 class PersonAdmin(NodeAdmin):
-    pass
+    prepopulated_fields = {"slug": ["surname", "name"]}
 
 class PlaceAdmin(NodeAdmin):
     pass
